@@ -24,7 +24,7 @@ function initials(name) {
 }
 
 function getAvatarColor(name, isAdmin) {
-  if (isAdmin) return { bg: "#1a1a18", text: "#fff" };
+  if (isAdmin) return { bg: "#3C3489", text: "#fff" };
   let h = 0;
   for (let i = 0; i < (name || "").length; i++) h = (name || "").charCodeAt(i) + ((h << 5) - h);
   return AVATAR_PALETTE[Math.abs(h) % AVATAR_PALETTE.length];
@@ -42,15 +42,12 @@ function Avatar({ name, size = 22, isAdmin = false }) {
   );
 }
 
-function Badge({ label, style, icon }) {
+function Badge({ label, style }) {
   return (
     <span style={{
       fontSize: 11, fontWeight: 500, padding: "2px 8px",
       borderRadius: 999, display: "inline-flex", alignItems: "center", gap: 3, ...style
-    }}>
-      {icon && <span style={{ fontSize: 11 }}>{icon}</span>}
-      {label}
-    </span>
+    }}>{label}</span>
   );
 }
 
@@ -62,7 +59,8 @@ function Modal({ show, onClose, children, width = 420 }) {
       display: "flex", alignItems: "center", justifyContent: "center", zIndex: 100, padding: "1rem"
     }} onClick={onClose}>
       <div style={{
-        background: "#fff", border: "0.5px solid #e0dfd7",
+        background: "var(--color-background-primary)",
+        border: "0.5px solid var(--color-border-tertiary)",
         borderRadius: 16, padding: "1.5rem", width, maxWidth: "100%", maxHeight: "90vh", overflowY: "auto"
       }} onClick={e => e.stopPropagation()}>
         {children}
@@ -80,7 +78,7 @@ function calculateProgress(steps) {
 function ProgressBar({ percent, height = 6 }) {
   const c = percent === 100 ? "#3B6D11" : percent >= 50 ? "#854F0B" : "#0C447C";
   return (
-    <div style={{ background: "#f1efe8", height, borderRadius: 999, overflow: "hidden" }}>
+    <div style={{ background: "var(--color-background-secondary)", height, borderRadius: 999, overflow: "hidden" }}>
       <div style={{ width: `${percent}%`, height: "100%", background: c, transition: "width 0.3s" }} />
     </div>
   );
@@ -88,17 +86,21 @@ function ProgressBar({ percent, height = 6 }) {
 
 const inputStyle = {
   width: "100%", padding: "7px 10px", borderRadius: 8,
-  border: "0.5px solid #d1d0c8", background: "#f5f5f3",
-  color: "#1a1a18", fontSize: 14, boxSizing: "border-box"
+  border: "0.5px solid var(--color-border-secondary)",
+  background: "var(--color-background-secondary)",
+  color: "var(--color-text-primary)", fontSize: 14, boxSizing: "border-box"
 };
-const labelStyle = { fontSize: 12, color: "#5f5e5a", display: "block", marginBottom: 4 };
+const labelStyle = { fontSize: 12, color: "var(--color-text-secondary)", display: "block", marginBottom: 4 };
 const btnPrimary = {
-  background: "#1a1a18", color: "#fff", border: "none",
-  borderRadius: 8, padding: "8px 16px", cursor: "pointer", fontSize: 13, fontWeight: 500
+  background: "var(--color-text-primary)", color: "var(--color-background-primary)",
+  border: "none", borderRadius: 8, padding: "8px 16px",
+  cursor: "pointer", fontSize: 13, fontWeight: 500
 };
 const btnSecondary = {
-  background: "#f1efe8", border: "0.5px solid #d1d0c8",
-  borderRadius: 8, padding: "8px 16px", cursor: "pointer", fontSize: 13, color: "#1a1a18"
+  background: "var(--color-background-secondary)",
+  border: "0.5px solid var(--color-border-secondary)",
+  borderRadius: 8, padding: "8px 16px", cursor: "pointer",
+  fontSize: 13, color: "var(--color-text-primary)"
 };
 
 export default function App({ session }) {
@@ -132,26 +134,20 @@ export default function App({ session }) {
   useEffect(() => {
     ensureProfile();
     loadData();
-
-    // Subscribe ke perubahan tasks (real-time)
     const channel = supabase.channel('tasks-changes')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'tasks' }, loadTasks)
       .subscribe();
-
     return () => supabase.removeChannel(channel);
     // eslint-disable-next-line
   }, []);
 
   async function ensureProfile() {
-    // Cek apakah profile sudah ada
     const { data } = await supabase.from('profiles').select('*').eq('id', user.id).single();
     if (!data) {
-      // Buat profile kalau belum ada
       await supabase.from('profiles').insert({
         id: user.id, email: user.email, full_name: userName, is_admin: isAdmin
       });
     } else if (data.is_admin !== isAdmin) {
-      // Update status admin kalau berubah
       await supabase.from('profiles').update({ is_admin: isAdmin }).eq('id', user.id);
     }
   }
@@ -172,20 +168,11 @@ export default function App({ session }) {
     if (data) setTasks(data);
   }
 
-  async function logout() {
-    await supabase.auth.signOut();
-  }
+  async function logout() { await supabase.auth.signOut(); }
 
-  function findProfile(name) {
-    return profiles.find(p => p.full_name === name);
-  }
-
-  function canEdit(task) {
-    return isAdmin || task.creator_id === user.id || task.assignee_id === user.id;
-  }
-  function canDelete(task) {
-    return isAdmin || task.creator_id === user.id;
-  }
+  function findProfile(name) { return profiles.find(p => p.full_name === name); }
+  function canEdit(task) { return isAdmin || task.creator_id === user.id || task.assignee_id === user.id; }
+  function canDelete(task) { return isAdmin || task.creator_id === user.id; }
 
   const filtered = tasks.filter(t =>
     (filterStatus === "Semua" || t.status === filterStatus) &&
@@ -201,10 +188,8 @@ export default function App({ session }) {
   async function saveTask() {
     if (!newTask.title.trim()) return;
     setSyncStatus("Menyimpan...");
-
     const assigneeProfile = findProfile(newTask.assignee_name);
     const approverProfile = newTask.approver_name ? findProfile(newTask.approver_name) : null;
-
     const taskData = {
       title: newTask.title,
       assignee_id: assigneeProfile?.id || null,
@@ -218,20 +203,15 @@ export default function App({ session }) {
       steps: newTask.steps,
       updated_at: new Date().toISOString(),
     };
-
     if (editingTask) {
       const { error } = await supabase.from('tasks').update(taskData).eq('id', editingTask.id);
       if (error) { setSyncStatus("Gagal: " + error.message); return; }
     } else {
       const { error } = await supabase.from('tasks').insert({
-        ...taskData,
-        creator_id: user.id,
-        creator_name: userName,
-        status: "Belum",
+        ...taskData, creator_id: user.id, creator_name: userName, status: "Belum",
       });
       if (error) { setSyncStatus("Gagal: " + error.message); return; }
     }
-
     setSyncStatus("Tersimpan");
     setTimeout(() => setSyncStatus(""), 1500);
     await loadTasks();
@@ -297,33 +277,10 @@ export default function App({ session }) {
 
   async function generateSummary() {
     setLoadingSummary(true); setShowSummary(true); setSummary("");
-    const today = new Date().toLocaleDateString("id-ID", { weekday: "long", year: "numeric", month: "long", day: "numeric" });
-    const pending = tasks.filter(t => t.status !== "Selesai");
-    const myTasks = pending.filter(t => t.assignee_id === user.id);
-    const prompt = `Kamu asisten produktivitas tim. Hari ini ${today}. Berbicara dengan ${userName}${isAdmin ? " (admin)" : ""}.
-
-Tugas tim belum selesai:
-${pending.map(t => {
-      const p = calculateProgress(t.steps);
-      return `- [${t.priority}] ${t.title} (Pemilik: ${t.creator_name}, Assignee: ${t.assignee_name}, Approver: ${t.approver_name || "-"}, Deadline: ${t.deadline || "-"}, Status: ${t.status}${p !== null ? `, Progress: ${p}%` : ""})`;
-    }).join("\n")}
-
-Tugas ${userName}:
-${myTasks.length > 0 ? myTasks.map(t => `- ${t.title}`).join("\n") : "(tidak ada)"}
-
-Buat rangkuman Bahasa Indonesia: sapa ${userName} personal, highlight prioritas tinggi & deadline dekat, beri rekomendasi fokus, kondisi tim. Format poin pendek, maks 200 kata.`;
-    try {
-      const res = await fetch("https://api.anthropic.com/v1/messages", {
-        method: "POST",
-        headers: { "Content-Type": "application/json", "x-api-key": "via-vercel-proxy", "anthropic-version": "2023-06-01" },
-        body: JSON.stringify({ model: "claude-sonnet-4-20250514", max_tokens: 1000, messages: [{ role: "user", content: prompt }] })
-      });
-      const data = await res.json();
-      setSummary(data.content?.find(b => b.type === "text")?.text || "Fitur AI belum aktif. Aktifkan di Tahap 3.");
-    } catch {
-      setSummary("Fitur AI belum aktif di production. Akan diaktifkan di tahap selanjutnya.");
-    }
-    setLoadingSummary(false);
+    setTimeout(() => {
+      setSummary(`Halo ${userName}!\n\nFitur AI rangkuman akan diaktifkan di Tahap 3 (bersama notifikasi email). Saat ini kamu bisa lihat statistik tim di tab Statistik untuk overview tugas yang ada.`);
+      setLoadingSummary(false);
+    }, 800);
   }
 
   function scheduleReminder() {
@@ -346,15 +303,11 @@ Buat rangkuman Bahasa Indonesia: sapa ${userName} personal, highlight prioritas 
     });
   }
 
-  // Statistik
   const todayStr = new Date().toISOString().split("T")[0];
   const stats = {
-    total: tasks.length,
-    selesai: counts.Selesai,
+    total: tasks.length, selesai: counts.Selesai,
     completionRate: tasks.length > 0 ? Math.round((counts.Selesai / tasks.length) * 100) : 0,
-    perMember: {},
-    overdue: 0,
-    today: 0,
+    perMember: {}, overdue: 0, today: 0,
   };
   tasks.forEach(t => {
     const k = t.assignee_name || "Belum di-assign";
@@ -365,21 +318,22 @@ Buat rangkuman Bahasa Indonesia: sapa ${userName} personal, highlight prioritas 
     if (t.deadline === todayStr && t.status !== "Selesai") stats.today++;
   });
 
-  if (loading) return <div style={{ padding: "3rem", textAlign: "center", color: "#5f5e5a" }}>Memuat data...</div>;
+  if (loading) return <div style={{ padding: "3rem", textAlign: "center", color: "var(--color-text-secondary)" }}>Memuat data...</div>;
 
   return (
-    <div style={{ maxWidth: 720, margin: "0 auto", padding: "1.5rem 1rem", fontFamily: "-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif" }}>
+    <div style={{ maxWidth: 720, margin: "0 auto", padding: "1.5rem 1rem", fontFamily: "var(--font-sans)" }}>
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "1rem", flexWrap: "wrap", gap: 8 }}>
-        <h2 style={{ fontSize: 18, fontWeight: 500, margin: 0, color: "#1a1a18" }}>
+        <h2 style={{ fontSize: 18, fontWeight: 500, margin: 0, color: "var(--color-text-primary)" }}>
           ✅ Team Task Reminder
         </h2>
         <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-          {syncStatus && <span style={{ fontSize: 11, color: "#888780" }}>{syncStatus}</span>}
+          {syncStatus && <span style={{ fontSize: 11, color: "var(--color-text-tertiary)" }}>{syncStatus}</span>}
           <button onClick={logout} style={{
             display: "flex", alignItems: "center", gap: 6,
-            background: isAdmin ? "#1a1a18" : "#f1efe8",
-            color: isAdmin ? "#fff" : "#5f5e5a",
-            border: "0.5px solid #d1d0c8", borderRadius: 999, padding: "4px 10px 4px 4px",
+            background: "var(--color-background-secondary)",
+            color: "var(--color-text-secondary)",
+            border: "0.5px solid var(--color-border-tertiary)",
+            borderRadius: 999, padding: "4px 10px 4px 4px",
             cursor: "pointer", fontSize: 12
           }}>
             <Avatar name={userName} size={22} isAdmin={isAdmin} />
@@ -400,13 +354,13 @@ Buat rangkuman Bahasa Indonesia: sapa ${userName} personal, highlight prioritas 
         ))}
       </div>
 
-      <div style={{ display: "flex", gap: 4, borderBottom: "0.5px solid #e0dfd7", marginBottom: "1rem", overflowX: "auto" }}>
+      <div style={{ display: "flex", gap: 4, borderBottom: "0.5px solid var(--color-border-tertiary)", marginBottom: "1rem", overflowX: "auto" }}>
         {[["tasks", "Tugas"], ["stats", "Statistik"], ["summary", "AI"], ["settings", "Pengingat"]].map(([t, label]) => (
           <button key={t} onClick={() => setTab(t)} style={{
             background: "none", border: "none", padding: "8px 14px", cursor: "pointer", fontSize: 13,
             fontWeight: tab === t ? 500 : 400, whiteSpace: "nowrap",
-            color: tab === t ? "#1a1a18" : "#5f5e5a",
-            borderBottom: tab === t ? "2px solid #1a1a18" : "2px solid transparent",
+            color: tab === t ? "var(--color-text-primary)" : "var(--color-text-secondary)",
+            borderBottom: tab === t ? "2px solid var(--color-text-primary)" : "2px solid transparent",
           }}>{label}</button>
         ))}
       </div>
@@ -422,7 +376,7 @@ Buat rangkuman Bahasa Indonesia: sapa ${userName} personal, highlight prioritas 
           <button onClick={() => { setNewTask(v => ({ ...v, assignee_name: userName })); setShowAdd(true); }} style={{ ...btnPrimary, padding: "7px 14px" }}>+ Tambah Tugas</button>
         </div>
 
-        {filtered.length === 0 && <div style={{ textAlign: "center", padding: "2rem", color: "#5f5e5a", fontSize: 14 }}>Tidak ada tugas.</div>}
+        {filtered.length === 0 && <div style={{ textAlign: "center", padding: "2rem", color: "var(--color-text-secondary)", fontSize: 14 }}>Tidak ada tugas.</div>}
 
         <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
           {filtered.map(t => {
@@ -432,19 +386,21 @@ Buat rangkuman Bahasa Indonesia: sapa ${userName} personal, highlight prioritas 
             const isOverdue = t.deadline && t.deadline < todayStr && t.status !== "Selesai";
             return (
               <div key={t.id} style={{
-                background: "#fff", border: `0.5px solid ${isOverdue ? "#F09595" : "#e0dfd7"}`,
-                borderRadius: 12, padding: "12px 14px", opacity: t.status === "Selesai" ? 0.7 : 1
+                background: "var(--color-background-primary)",
+                border: `0.5px solid ${isOverdue ? "#F09595" : "var(--color-border-tertiary)"}`,
+                borderRadius: 12, padding: "12px 14px",
+                opacity: t.status === "Selesai" ? 0.7 : 1
               }}>
                 <div style={{ display: "flex", alignItems: "flex-start", gap: 10 }}>
                   <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ fontWeight: 500, fontSize: 14, marginBottom: 8, textDecoration: t.status === "Selesai" ? "line-through" : "none" }}>
+                    <div style={{ fontWeight: 500, fontSize: 14, marginBottom: 8, color: "var(--color-text-primary)", textDecoration: t.status === "Selesai" ? "line-through" : "none" }}>
                       {t.title}
                       {isOverdue && <Badge label="Terlambat" style={{ background: "#FCEBEB", color: "#A32D2D", marginLeft: 8 }} />}
                     </div>
 
                     {progress !== null && (
                       <div style={{ marginBottom: 8 }}>
-                        <div style={{ display: "flex", justifyContent: "space-between", fontSize: 11, color: "#5f5e5a", marginBottom: 3 }}>
+                        <div style={{ display: "flex", justifyContent: "space-between", fontSize: 11, color: "var(--color-text-secondary)", marginBottom: 3 }}>
                           <span>Progress</span><span style={{ fontWeight: 500 }}>{progress}%</span>
                         </div>
                         <ProgressBar percent={progress} />
@@ -453,24 +409,27 @@ Buat rangkuman Bahasa Indonesia: sapa ${userName} personal, highlight prioritas 
 
                     <div style={{ display: "flex", gap: 6, flexWrap: "wrap", alignItems: "center" }}>
                       <Badge label={t.priority} style={{ background: PRIORITY_COLOR[t.priority].bg, color: PRIORITY_COLOR[t.priority].text }} />
-                      {[["pemilik", t.creator_name], ["kerjakan", t.assignee_name], ...(t.approver_name ? [["approver", t.approver_name]] : [])].map(([role, name]) => (
-                        <span key={role} style={{ display: "inline-flex", alignItems: "center", gap: 4, background: "#f1efe8", borderRadius: 999, padding: "2px 8px 2px 3px", fontSize: 11, color: "#5f5e5a" }}>
-                          <Avatar name={name} size={16} isAdmin={isAdminEmail(profiles.find(p => p.full_name === name)?.email)} />
-                          <span style={{ fontWeight: 500 }}>{name}</span>
-                          <span style={{ color: "#888780", fontSize: 10 }}>{role}</span>
-                        </span>
-                      ))}
-                      {t.start_date && <span style={{ fontSize: 11, color: "#888780" }}>▶ {t.start_date}</span>}
-                      {t.deadline && <span style={{ fontSize: 11, color: isOverdue ? "#A32D2D" : "#888780" }}>📅 {t.deadline}</span>}
+                      {[["pemilik", t.creator_name], ["kerjakan", t.assignee_name], ...(t.approver_name ? [["approver", t.approver_name]] : [])].map(([role, name]) => {
+                        const profileMatch = profiles.find(p => p.full_name === name);
+                        return (
+                          <span key={role} style={{ display: "inline-flex", alignItems: "center", gap: 4, background: "var(--color-background-secondary)", borderRadius: 999, padding: "2px 8px 2px 3px", fontSize: 11, color: "var(--color-text-secondary)" }}>
+                            <Avatar name={name} size={16} isAdmin={profileMatch?.is_admin} />
+                            <span style={{ fontWeight: 500 }}>{name}</span>
+                            <span style={{ color: "var(--color-text-tertiary)", fontSize: 10 }}>{role}</span>
+                          </span>
+                        );
+                      })}
+                      {t.start_date && <span style={{ fontSize: 11, color: "var(--color-text-tertiary)" }}>▶ {t.start_date}</span>}
+                      {t.deadline && <span style={{ fontSize: 11, color: isOverdue ? "#A32D2D" : "var(--color-text-tertiary)" }}>📅 {t.deadline}</span>}
                     </div>
 
                     {t.steps && t.steps.length > 0 && (
-                      <div style={{ marginTop: 10, paddingTop: 10, borderTop: "0.5px solid #e0dfd7" }}>
+                      <div style={{ marginTop: 10, paddingTop: 10, borderTop: "0.5px solid var(--color-border-tertiary)" }}>
                         {t.steps.map(s => (
                           <div key={s.id} style={{ display: "flex", alignItems: "center", gap: 8, padding: "3px 0", fontSize: 13 }}>
                             <input type="checkbox" checked={s.done} onChange={() => toggleStepInTask(t, s.id)} disabled={!editable}
                               style={{ width: 14, height: 14, cursor: editable ? "pointer" : "not-allowed" }} />
-                            <span style={{ textDecoration: s.done ? "line-through" : "none", color: s.done ? "#888780" : "#1a1a18" }}>{s.text}</span>
+                            <span style={{ textDecoration: s.done ? "line-through" : "none", color: s.done ? "var(--color-text-tertiary)" : "var(--color-text-primary)" }}>{s.text}</span>
                           </div>
                         ))}
                       </div>
@@ -483,8 +442,8 @@ Buat rangkuman Bahasa Indonesia: sapa ${userName} personal, highlight prioritas 
                       {STATUS_LIST.map(s => <option key={s}>{s}</option>)}
                     </select>
                     <div style={{ display: "flex", gap: 4 }}>
-                      {editable && <button onClick={() => openEdit(t)} style={{ background: "none", border: "none", cursor: "pointer", color: "#888780", padding: 2, fontSize: 14 }}>✏️</button>}
-                      {deletable && <button onClick={() => setConfirmDelete(t.id)} style={{ background: "none", border: "none", cursor: "pointer", color: "#888780", padding: 2, fontSize: 14 }}>🗑️</button>}
+                      {editable && <button onClick={() => openEdit(t)} style={{ background: "none", border: "none", cursor: "pointer", color: "var(--color-text-tertiary)", padding: 2, fontSize: 14 }}>✏️</button>}
+                      {deletable && <button onClick={() => setConfirmDelete(t.id)} style={{ background: "none", border: "none", cursor: "pointer", color: "var(--color-text-tertiary)", padding: 2, fontSize: 14 }}>🗑️</button>}
                     </div>
                   </div>
                 </div>
@@ -497,12 +456,12 @@ Buat rangkuman Bahasa Indonesia: sapa ${userName} personal, highlight prioritas 
       {tab === "stats" && (
         <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
           <div style={{ display: "grid", gridTemplateColumns: "repeat(2,1fr)", gap: 10 }}>
-            <div style={{ background: "#f1efe8", borderRadius: 10, padding: "12px 14px" }}>
-              <div style={{ fontSize: 11, color: "#5f5e5a" }}>Total Tugas</div>
-              <div style={{ fontSize: 24, fontWeight: 500 }}>{stats.total}</div>
+            <div style={{ background: "var(--color-background-secondary)", borderRadius: 10, padding: "12px 14px" }}>
+              <div style={{ fontSize: 11, color: "var(--color-text-secondary)" }}>Total Tugas</div>
+              <div style={{ fontSize: 24, fontWeight: 500, color: "var(--color-text-primary)" }}>{stats.total}</div>
             </div>
-            <div style={{ background: "#f1efe8", borderRadius: 10, padding: "12px 14px" }}>
-              <div style={{ fontSize: 11, color: "#5f5e5a" }}>Tingkat Selesai</div>
+            <div style={{ background: "var(--color-background-secondary)", borderRadius: 10, padding: "12px 14px" }}>
+              <div style={{ fontSize: 11, color: "var(--color-text-secondary)" }}>Tingkat Selesai</div>
               <div style={{ fontSize: 24, fontWeight: 500, color: "#3B6D11" }}>{stats.completionRate}%</div>
             </div>
             <div style={{ background: "#FAEEDA", borderRadius: 10, padding: "12px 14px" }}>
@@ -515,37 +474,37 @@ Buat rangkuman Bahasa Indonesia: sapa ${userName} personal, highlight prioritas 
             </div>
           </div>
 
-          <div style={{ background: "#fff", border: "0.5px solid #e0dfd7", borderRadius: 12, padding: "1rem 1.25rem" }}>
-            <h3 style={{ fontSize: 14, fontWeight: 500, margin: "0 0 12px" }}>Performa per Anggota</h3>
+          <div style={{ background: "var(--color-background-primary)", border: "0.5px solid var(--color-border-tertiary)", borderRadius: 12, padding: "1rem 1.25rem" }}>
+            <h3 style={{ fontSize: 14, fontWeight: 500, margin: "0 0 12px", color: "var(--color-text-primary)" }}>Performa per Anggota</h3>
             {Object.entries(stats.perMember).sort((a, b) => b[1].total - a[1].total).map(([name, d]) => {
               const pct = d.total > 0 ? Math.round((d.done / d.total) * 100) : 0;
               return (
                 <div key={name} style={{ marginBottom: 12 }}>
                   <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 4 }}>
-                    <span style={{ display: "inline-flex", alignItems: "center", gap: 6, fontSize: 13 }}>
+                    <span style={{ display: "inline-flex", alignItems: "center", gap: 6, fontSize: 13, color: "var(--color-text-primary)" }}>
                       <Avatar name={name} size={20} />{name}
                     </span>
-                    <span style={{ fontSize: 12, color: "#5f5e5a" }}>{d.done}/{d.total} • {pct}%</span>
+                    <span style={{ fontSize: 12, color: "var(--color-text-secondary)" }}>{d.done}/{d.total} • {pct}%</span>
                   </div>
                   <ProgressBar percent={pct} height={6} />
                 </div>
               );
             })}
-            {Object.keys(stats.perMember).length === 0 && <p style={{ fontSize: 13, color: "#888780", margin: 0 }}>Belum ada data.</p>}
+            {Object.keys(stats.perMember).length === 0 && <p style={{ fontSize: 13, color: "var(--color-text-tertiary)", margin: 0 }}>Belum ada data.</p>}
           </div>
         </div>
       )}
 
       {tab === "summary" && (
         <div>
-          <p style={{ fontSize: 14, color: "#5f5e5a", marginBottom: "1rem" }}>AI akan merangkum tugas untuk {userName}.</p>
+          <p style={{ fontSize: 14, color: "var(--color-text-secondary)", marginBottom: "1rem" }}>AI akan merangkum tugas untuk {userName}.</p>
           <button onClick={generateSummary} disabled={loadingSummary} style={{ ...btnPrimary, padding: "9px 18px", fontSize: 14, marginBottom: "1.25rem" }}>
             ✨ {loadingSummary ? "Sedang merangkum..." : "Rangkum Sekarang"}
           </button>
           {showSummary && (
-            <div style={{ background: "#f1efe8", border: "0.5px solid #e0dfd7", borderRadius: 12, padding: "1rem 1.25rem" }}>
-              {loadingSummary ? <span style={{ color: "#5f5e5a", fontSize: 14 }}>Menghubungi AI...</span>
-                : <div style={{ fontSize: 14, lineHeight: 1.7, whiteSpace: "pre-wrap" }}>{summary}</div>}
+            <div style={{ background: "var(--color-background-secondary)", border: "0.5px solid var(--color-border-tertiary)", borderRadius: 12, padding: "1rem 1.25rem" }}>
+              {loadingSummary ? <span style={{ color: "var(--color-text-secondary)", fontSize: 14 }}>Menghubungi AI...</span>
+                : <div style={{ fontSize: 14, lineHeight: 1.7, whiteSpace: "pre-wrap", color: "var(--color-text-primary)" }}>{summary}</div>}
             </div>
           )}
         </div>
@@ -553,32 +512,32 @@ Buat rangkuman Bahasa Indonesia: sapa ${userName} personal, highlight prioritas 
 
       {tab === "settings" && (
         <div style={{ maxWidth: 360 }}>
-          <div style={{ background: "#fff", border: "0.5px solid #e0dfd7", borderRadius: 12, padding: "1.25rem" }}>
+          <div style={{ background: "var(--color-background-primary)", border: "0.5px solid var(--color-border-tertiary)", borderRadius: 12, padding: "1.25rem" }}>
             <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "1.25rem" }}>
-              <span style={{ fontWeight: 500, fontSize: 14 }}>Aktifkan Pengingat</span>
-              <div onClick={() => setReminderEnabled(v => !v)} style={{ width: 42, height: 24, borderRadius: 999, cursor: "pointer", background: reminderEnabled ? "#639922" : "#f1efe8", border: "0.5px solid #d1d0c8", position: "relative" }}>
-                <div style={{ position: "absolute", top: 3, left: reminderEnabled ? 20 : 3, width: 18, height: 18, borderRadius: "50%", background: reminderEnabled ? "white" : "#888780", transition: "left 0.2s" }} />
+              <span style={{ fontWeight: 500, fontSize: 14, color: "var(--color-text-primary)" }}>Aktifkan Pengingat</span>
+              <div onClick={() => setReminderEnabled(v => !v)} style={{ width: 42, height: 24, borderRadius: 999, cursor: "pointer", background: reminderEnabled ? "#639922" : "var(--color-background-secondary)", border: "0.5px solid var(--color-border-secondary)", position: "relative" }}>
+                <div style={{ position: "absolute", top: 3, left: reminderEnabled ? 20 : 3, width: 18, height: 18, borderRadius: "50%", background: reminderEnabled ? "white" : "var(--color-text-tertiary)", transition: "left 0.2s" }} />
               </div>
             </div>
             <label style={labelStyle}>Waktu Pengingat</label>
             <input type="time" value={reminderTime} onChange={e => setReminderTime(e.target.value)} disabled={!reminderEnabled} style={{ ...inputStyle, marginBottom: "1rem", opacity: reminderEnabled ? 1 : 0.4 }} />
             <button onClick={scheduleReminder} disabled={!reminderEnabled} style={{ ...btnPrimary, padding: "9px 18px", fontSize: 14, width: "100%", opacity: reminderEnabled ? 1 : 0.4 }}>🔔 Simpan Pengingat</button>
-            {notifStatus && <p style={{ fontSize: 12, color: "#5f5e5a", marginTop: 10 }}>{notifStatus}</p>}
+            {notifStatus && <p style={{ fontSize: 12, color: "var(--color-text-secondary)", marginTop: 10 }}>{notifStatus}</p>}
           </div>
 
-          <div style={{ background: "#fff", border: "0.5px solid #e0dfd7", borderRadius: 12, padding: "1.25rem", marginTop: 12 }}>
-            <h3 style={{ fontSize: 14, fontWeight: 500, margin: "0 0 12px" }}>Akun</h3>
-            <p style={{ fontSize: 13, color: "#5f5e5a", margin: "0 0 4px" }}>Email: <strong>{user.email}</strong></p>
-            <p style={{ fontSize: 13, color: "#5f5e5a", margin: "0 0 12px" }}>Status: <strong>{isAdmin ? "Admin 🛡️" : "Anggota Tim"}</strong></p>
+          <div style={{ background: "var(--color-background-primary)", border: "0.5px solid var(--color-border-tertiary)", borderRadius: 12, padding: "1.25rem", marginTop: 12 }}>
+            <h3 style={{ fontSize: 14, fontWeight: 500, margin: "0 0 12px", color: "var(--color-text-primary)" }}>Akun</h3>
+            <p style={{ fontSize: 13, color: "var(--color-text-secondary)", margin: "0 0 4px" }}>Email: <strong>{user.email}</strong></p>
+            <p style={{ fontSize: 13, color: "var(--color-text-secondary)", margin: "0 0 12px" }}>Status: <strong>{isAdmin ? "Admin 🛡️" : "Anggota Tim"}</strong></p>
             <button onClick={logout} style={{ ...btnSecondary, width: "100%" }}>Keluar</button>
           </div>
         </div>
       )}
 
       <Modal show={showAdd} onClose={closeModal}>
-        <h3 style={{ fontWeight: 500, fontSize: 16, margin: "0 0 4px" }}>{editingTask ? "Edit Tugas" : "Tambah Tugas Baru"}</h3>
-        <p style={{ fontSize: 12, color: "#888780", margin: "0 0 14px" }}>
-          Pemilik: <strong style={{ color: "#5f5e5a" }}>{editingTask ? editingTask.creator_name : userName}</strong>
+        <h3 style={{ fontWeight: 500, fontSize: 16, margin: "0 0 4px", color: "var(--color-text-primary)" }}>{editingTask ? "Edit Tugas" : "Tambah Tugas Baru"}</h3>
+        <p style={{ fontSize: 12, color: "var(--color-text-tertiary)", margin: "0 0 14px" }}>
+          Pemilik: <strong style={{ color: "var(--color-text-secondary)" }}>{editingTask ? editingTask.creator_name : userName}</strong>
         </p>
         <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
           <div>
@@ -630,15 +589,15 @@ Buat rangkuman Bahasa Indonesia: sapa ${userName} personal, highlight prioritas 
               <button onClick={addStep} style={{ ...btnSecondary, padding: "7px 12px" }}>+</button>
             </div>
             {newTask.steps.length > 0 && (
-              <div style={{ background: "#f1efe8", borderRadius: 8, padding: "8px 10px" }}>
+              <div style={{ background: "var(--color-background-secondary)", borderRadius: 8, padding: "8px 10px" }}>
                 {newTask.steps.map(s => (
                   <div key={s.id} style={{ display: "flex", alignItems: "center", gap: 8, padding: "3px 0", fontSize: 13 }}>
                     <input type="checkbox" checked={s.done} onChange={() => toggleStepInForm(s.id)} style={{ cursor: "pointer" }} />
-                    <span style={{ flex: 1, textDecoration: s.done ? "line-through" : "none", color: s.done ? "#888780" : "#1a1a18" }}>{s.text}</span>
-                    <button onClick={() => removeStepInForm(s.id)} style={{ background: "none", border: "none", color: "#888780", cursor: "pointer", fontSize: 12 }}>✕</button>
+                    <span style={{ flex: 1, textDecoration: s.done ? "line-through" : "none", color: s.done ? "var(--color-text-tertiary)" : "var(--color-text-primary)" }}>{s.text}</span>
+                    <button onClick={() => removeStepInForm(s.id)} style={{ background: "none", border: "none", color: "var(--color-text-tertiary)", cursor: "pointer", fontSize: 12 }}>✕</button>
                   </div>
                 ))}
-                <div style={{ marginTop: 6, fontSize: 11, color: "#5f5e5a" }}>
+                <div style={{ marginTop: 6, fontSize: 11, color: "var(--color-text-secondary)" }}>
                   Progress: {calculateProgress(newTask.steps)}% ({newTask.steps.filter(s => s.done).length}/{newTask.steps.length})
                 </div>
               </div>
@@ -653,11 +612,11 @@ Buat rangkuman Bahasa Indonesia: sapa ${userName} personal, highlight prioritas 
       </Modal>
 
       <Modal show={!!confirmDelete} onClose={() => setConfirmDelete(null)} width={340}>
-        <h3 style={{ fontWeight: 500, fontSize: 16, margin: "0 0 8px" }}>⚠️ Hapus tugas?</h3>
-        <p style={{ fontSize: 13, color: "#5f5e5a", margin: "0 0 16px" }}>Tugas ini akan dihapus permanen dan tidak bisa dikembalikan.</p>
+        <h3 style={{ fontWeight: 500, fontSize: 16, margin: "0 0 8px", color: "var(--color-text-primary)" }}>⚠️ Hapus tugas?</h3>
+        <p style={{ fontSize: 13, color: "var(--color-text-secondary)", margin: "0 0 16px" }}>Tugas ini akan dihapus permanen dan tidak bisa dikembalikan.</p>
         <div style={{ display: "flex", gap: 8, justifyContent: "flex-end" }}>
           <button onClick={() => setConfirmDelete(null)} style={btnSecondary}>Batal</button>
-          <button onClick={deleteTaskConfirmed} style={{ ...btnPrimary, background: "#A32D2D" }}>Ya, Hapus</button>
+          <button onClick={deleteTaskConfirmed} style={{ ...btnPrimary, background: "#A32D2D", color: "#fff" }}>Ya, Hapus</button>
         </div>
       </Modal>
     </div>
